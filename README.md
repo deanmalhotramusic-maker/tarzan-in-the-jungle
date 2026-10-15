@@ -29,7 +29,8 @@ Open `index.html` in a browser, or turn on GitHub Pages for this repo (Settings 
 
 ## What's in this version
 
-- Full 3D third-person world with low-poly graphics, real shadows, fog, sky and lighting
+- Full 3D third-person world: realistic lighting with soft shadows, a sky with moving clouds, reflective water, textured ground and bark, wind-blown grass, leafy trees, palms, ferns, flowers, birds and butterflies
+- Graphics setting (Auto / Low / Medium / High) in Settings; Auto lowers itself if a phone struggles
 - Six zones: Ape Village, Dense Forest, Riverbank, Swamp, Rocky Cliffs, Ancient Ruins
 - Vine swinging with pendulum physics and swing combos
 - Survival meters: food, water, bathroom, warmth, energy
@@ -41,6 +42,10 @@ Open `index.html` in a browser, or turn on GitHub Pages for this repo (Settings 
 - Quests from Elder Kerchak, mini-map, saves in the browser
 
 Coming next: Serpent's Lair, Waterfall Grotto and the Ancient Ruins Temple (their entrances are already in the world, sealed).
+
+## Install as an app
+
+Open the game link on your phone. Android (Chrome): tap **Install app**. iPhone (Safari): Share → **Add to Home Screen**. It runs full screen and works offline.
 
 ## Code
 
