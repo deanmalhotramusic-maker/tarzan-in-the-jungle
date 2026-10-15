@@ -762,7 +762,7 @@ function makeSpider(){const g=new T.Group(),u={};g.userData=u;const sk=M('#3a1a4
 // ================= real assets (CC0): animated models, photo-scanned textures, HDRI =================
 // Models: Quaternius (Ultimate Animated Character Pack, Ultimate Animated Animal Pack). Textures and sky: Poly Haven. All CC0.
 const ASSET={tex:{},gltf:{},ready:false};
-const TARZAN_MODEL=false; // the cartoon mannequin looked worse than the hand-built Tarzan; a realistic CC0 body can be dropped in at models/tarzan.glb
+const TARZAN_MODEL=true;
 const flatN=(()=>{const d=new Uint8Array([128,128,255,255]);const t=new T.DataTexture(d,1,1,T.RGBAFormat);t.needsUpdate=true;return t})();
 const whiteT=(()=>{const d=new Uint8Array([255,255,255,255]);const t=new T.DataTexture(d,1,1,T.RGBAFormat);t.needsUpdate=true;return t})();
 const terrU={uReady:{value:0},tGrass:{value:whiteT},tMud:{value:whiteT},tRock:{value:whiteT},nGrass:{value:flatN},nMud:{value:flatN},nRock:{value:flatN}};
@@ -790,7 +790,7 @@ function loadAssets(){
   Promise.all([tex('grass.jpg',1),tex('grass_n.jpg'),tex('mud.jpg',1),tex('mud_n.jpg'),tex('rock.jpg',1),tex('rock_n.jpg'),tex('bark.jpg',1),tex('bark_n.jpg')]).then(([g,gn,m,mn,r,rn,b,bn])=>{
     if(!g||!m||!r)return;Object.assign(ASSET.tex,{g,gn,m,mn,r,rn,b,bn});ASSET.ready=true;applyTextures()});
   if(T.RGBELoader)new T.RGBELoader().setDataType(T.UnsignedByteType).load('textures/sky.hdr',hdr=>{const pm2=new T.PMREMGenerator(renderer);ASSET.env=pm2.fromEquirectangular(hdr).texture;hdr.dispose();pm2.dispose();scene.environment=ASSET.env;skyT2=0},undefined,()=>{});
-  if(T.GLTFLoader){const gl=new T.GLTFLoader();['wolf','deer'].concat(TARZAN_MODEL?['tarzan']:[]).forEach(n=>gl.load('models/'+n+'.glb',g=>{ASSET.gltf[n]=g;onModel(n)},undefined,e=>console.warn('model',n,e)))}
+  if(T.GLTFLoader){const gl=new T.GLTFLoader();['wolf','deer'].concat(TARZAN_MODEL?['tarzan_body','tarzan_hair','tarzan_anims']:[]).forEach(n=>gl.load('models/'+n+'.glb',g=>{ASSET.gltf[n]=g;onModel(n)},undefined,e=>console.warn('model',n,e)))}
 }
 function photoMat(base,map,nmap,rep,extra){const t=map.clone(),n=nmap?nmap.clone():null;t.needsUpdate=true;t.repeat.set(rep[0],rep[1]);if(n){n.needsUpdate=true;n.repeat.set(rep[0],rep[1])}
   return new T.MeshStandardMaterial(Object.assign({map:t,normalMap:n||undefined,roughness:.92,metalness:0},extra||{}))}
@@ -805,56 +805,67 @@ function applyTextures(){const A=ASSET.tex,W=worldLevel;if(!ASSET.ready)return;
   const mound=photoMat(null,A.r,A.rn,[3,3],{color:LIN('#c8c0b0')});W.moundMeshes&&W.moundMeshes.forEach(m=>swap(m,mound));
 }
 function caveRockMat(fallback){if(!ASSET.ready)return fallback;return photoMat(null,ASSET.tex.r,ASSET.tex.rn,[8,1],{color:LIN('#8a7a78')})}
-// ---------- animated Tarzan ----------
-let tz=null;
-function onModel(n){if(n==='tarzan')setupTarzan();else{const g=ASSET.gltf[n];
-  g.scene.traverse(o=>{if(!o.isMesh)return;const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>{m.roughness=.85;m.metalness=0;
-    if(n==='wolf'){if(m.name==='Main')m.color.set('#8a7048').convertSRGBToLinear();if(m.name==='Main_Light')m.color.set('#c4a874').convertSRGBToLinear()}})})}}
-function setupTarzan(){const g=ASSET.gltf.tarzan;if(!g||tz||!pm)return;const MS=.575;const root=g.scene;root.scale.setScalar(MS);
-  const skin=LIN('#9c6440');
-  root.traverse(o=>{if(o.isMesh){o.castShadow=Q.shadows;o.receiveShadow=true;o.frustumCulled=false;const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>{if(m.name==='Skin'){m.color.copy(skin);m.roughness=.58;m.metalness=0}else{m.roughness=.5;m.metalness=0}})}});
-  const B=n=>root.getObjectByName(n);const bones={hips:B('Hips'),head:B('Head'),torso:B('Torso'),uaL:B('UpperArm.L'),uaR:B('UpperArm.R'),laL:B('LowerArm.L'),laR:B('LowerArm.R'),ulL:B('UpperLeg.L'),ulR:B('UpperLeg.R')};
-  // attachments built in metres, then scaled into the model's units
-  const inv=1/MS;
-  if(bones.hips){const lc=new T.Group();const skirt=mesh(lathe([[.2,.1],[.21,0],[.24,-.14],[.26,-.2]],16),M('#5e3618',{roughness:.95,side:T.DoubleSide}));const f1=box(.24,.32,.035,'#4e2c12');f1.position.set(0,-.2,.2);const f2=f1.clone();f2.position.z=-.2;lc.add(skirt,f1,f2);lc.scale.setScalar(inv);lc.position.set(0,0,0);bones.hips.add(lc);tzAttach.loin=lc}
-  if(bones.head){const hg=new T.Group();const hm=M('#1e1008',{roughness:.7});for(let k=0;k<11;k++){const st=cone(.055,.55+Math.random()*.2,'#1e1008',6);st.material=hm;st.rotation.x=Math.PI+.35;st.position.set((k-5)*.035,-.15,-.13-Math.abs(k-5)*.004);st.rotation.z=(k-5)*.06;hg.add(st)}
-    const cap=sph(.17,'#1e1008');cap.material=hm;cap.scale.set(1.05,.75,1.1);cap.position.set(0,.12,-.03);hg.add(cap);hg.scale.setScalar(inv);hg.position.set(0,.2*inv*.5,0);bones.head.add(hg);tzAttach.hair=hg}
-  if(bones.torso){const sp=cyl(.022,.022,1.7,'#a87a4a',6);sp.rotation.z=.25;sp.scale.setScalar(inv);sp.position.set(0,.1*inv,-.2*inv);bones.torso.add(sp);tzAttach.spear=sp}
-  const mixer=new T.AnimationMixer(root);const acts={};g.animations.forEach(c=>{acts[c.name]=mixer.clipAction(c)});
-  ['Jump','Punch','Roll','RecieveHit','PickUp','Death'].forEach(n=>{if(acts[n]){acts[n].setLoop(T.LoopOnce);acts[n].clampWhenFinished=true}});
-  const wrap=new T.Group();wrap.add(root);scene.remove(pm);pm=wrap;scene.add(pm);
-  tz={root,mixer,acts,cur:null,bones};pm.userData={model:true};playTz('Idle',0);
+// ---------- animated Tarzan (Quaternius Universal Base Characters + Universal Animation Library, CC0) ----------
+let tz=null;const tzAttach={};
+const TZ={yaw:0,height:1.86};
+function onModel(n){if(n==='wolf'||n==='deer'){const g=ASSET.gltf[n];
+    g.scene.traverse(o=>{if(!o.isMesh)return;const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>{m.roughness=.85;m.metalness=0;
+      if(n==='wolf'){if(m.name==='Main')m.color.set('#8a7048').convertSRGBToLinear();if(m.name==='Main_Light')m.color.set('#c4a874').convertSRGBToLinear()}})})}
+  if(ASSET.gltf.tarzan_body&&ASSET.gltf.tarzan_anims)setupTarzan();if(tz&&ASSET.gltf.tarzan_hair&&!tz.hair)attachHair()}
+function setupTarzan(){if(tz||!pm)return;const body=ASSET.gltf.tarzan_body;const root=body.scene;
+  root.updateMatrixWorld(true);const bb=new T.Box3().setFromObject(root);const h=bb.max.y-bb.min.y;const s=h>.1?TZ.height/h:1;root.scale.setScalar(s);root.position.y=-bb.min.y*s;
+  let skel=null,skinParent=null;
+  root.traverse(o=>{if(o.isMesh){o.castShadow=Q.shadows;o.receiveShadow=true;o.frustumCulled=false;const m=o.material;if(m){m.metalness=0;if(m.name==='MI_Superhero_Male'){m.color.set('#f0d8c0').convertSRGBToLinear()}if(m.name==='MI_Eyes')m.roughness=.25;if(m.name==='MI_Hair_1')m.color.set('#3a2414').convertSRGBToLinear()}}
+    if(o.isSkinnedMesh&&!skel){skel=o.skeleton;skinParent=o.parent}});
+  const bones={};if(skel)skel.bones.forEach(b=>bones[b.name]=b);
+  const inv=1/s;
+  if(bones.pelvis){const lc=new T.Group();const skirt=mesh(lathe([[.17,.06],[.19,-.02],[.22,-.16],[.24,-.24]],18),M('#5e3618',{roughness:.95,side:T.DoubleSide}));const f1=box(.24,.34,.035,'#4e2c12');f1.position.set(0,-.22,.15);const f2=f1.clone();f2.position.z=-.15;lc.add(skirt,f1,f2);lc.scale.setScalar(inv);bones.pelvis.add(lc);tzAttach.loin=lc}
+  const sp=cyl(.022,.022,1.7,'#a87a4a',6);sp.scale.setScalar(inv);(bones.spine_03||bones.spine_02||root).add(sp);sp.position.set(0,0,-.18*inv);sp.rotation.set(0,0,.25);tzAttach.spear=sp;
+  const mixer=new T.AnimationMixer(root);const acts={};ASSET.gltf.tarzan_anims.animations.forEach(c=>{acts[c.name]=mixer.clipAction(c)});
+  ['Jump_Start','Jump_Land','Punch_Jab','Punch_Cross','Roll','Hit_Chest','Death01','Interact','PickUp_Table'].forEach(n=>{if(acts[n]){acts[n].setLoop(T.LoopOnce);acts[n].clampWhenFinished=true}});
+  const inner=new T.Group();inner.add(root);inner.rotation.y=TZ.yaw;const wrap=new T.Group();wrap.add(inner);scene.remove(pm);pm=wrap;scene.add(pm);
+  tz={root,inner,mixer,acts,cur:null,bones,skinParent,scale:s,hair:null};pm.userData={model:true};playTz('Idle_Loop',0);
+  if(ASSET.gltf.tarzan_hair)attachHair();
 }
-const tzAttach={};
+function attachHair(){const g=ASSET.gltf.tarzan_hair;if(!tz||tz.hair||!g)return;let done=false;
+  g.scene.traverse(o=>{if(!o.isSkinnedMesh||done)return;const bones=o.skeleton.bones.map(b=>tz.bones[b.name]);if(bones.some(b=>!b))return;
+    const sk=new T.Skeleton(bones,o.skeleton.boneInverses);const m=new T.SkinnedMesh(o.geometry,o.material);m.bind(sk,o.bindMatrix);m.castShadow=Q.shadows;m.frustumCulled=false;if(m.material){m.material=m.material.clone();m.material.metalness=0;m.material.roughness=.65;m.material.color.set('#4a2c18').convertSRGBToLinear()}
+    (tz.skinParent||tz.root).add(m);tz.hair=m;done=true});
+  if(!done){g.scene.traverse(o=>{if(o.isMesh&&!done&&tz.bones.Head){const m=o.clone();tz.bones.Head.add(m);tz.hair=m;done=true}})}}
 function playTz(name,fade=.18,from0){if(!tz)return;const a=tz.acts[name];if(!a)return;if(tz.cur===name&&!from0)return;const prev=tz.acts[tz.cur];a.reset();a.enabled=true;a.setEffectiveWeight(1);a.play();if(prev&&prev!==a)prev.crossFadeTo(a,fade,false);tz.cur=name}
 function animTarzanModel(dt){const p=player,t=p.anim;pm.position.set(p.x,p.y,p.z);pm.rotation.set(0,p.yaw,0);
-  const sp=Math.hypot(p.vx,p.vz);let want='Idle',ts=1;
-  if(p.sleep>0)want='Defeat';
-  else if(p.swing)want='Jump';
-  else if(p.climb)want='Walk';
+  const sp=Math.hypot(p.vx,p.vz),deep=waterDepth(p.x,p.z)>1.1&&p.y<.2&&!p.swing;let want='Idle_Loop';
+  if(p.sleep>0)want='Death01';
+  else if(p.swing)want='Jump_Loop';
+  else if(p.climb)want='Crouch_Fwd_Loop';
   else if(p.roll>0)want='Roll';
-  else if(p.punch>0)want='Punch';
-  else if((p.hitT||0)>0)want='RecieveHit';
-  else if(!p.onGround)want='Jump';
-  else if(p.relief>0||p.crouch&&sp<.5)want='PickUp';
-  else if(sp>4.2)want='Run';
-  else if(sp>.4)want='Walk';
-  const restart=(want==='Punch'&&tz.lastPunch!==p.punchId)||(want==='Jump'&&tz.cur!=='Jump');
-  if(want==='Punch')tz.lastPunch=p.punchId;
-  playTz(want,want==='Punch'||want==='Roll'?.08:.18,restart);
+  else if(p.punch>0)want=tz.punchSide?'Punch_Cross':'Punch_Jab';
+  else if((p.hitT||0)>0)want='Hit_Chest';
+  else if(deep)want=sp>.5?'Swim_Fwd_Loop':'Swim_Idle_Loop';
+  else if(!p.onGround)want='Jump_Loop';
+  else if(p.relief>0)want='Crouch_Idle_Loop';
+  else if(p.crouch)want=sp>.4?'Crouch_Fwd_Loop':'Crouch_Idle_Loop';
+  else if(sp>6.8)want='Sprint_Loop';
+  else if(sp>3.2)want='Jog_Fwd_Loop';
+  else if(sp>.4)want='Walk_Loop';
+  const newPunch=want.startsWith('Punch')&&tz.lastPunch!==p.punchId;if(newPunch){tz.lastPunch=p.punchId;tz.punchSide=!tz.punchSide;want=tz.punchSide?'Punch_Cross':'Punch_Jab'}
+  playTz(want,want.startsWith('Punch')||want==='Roll'?.08:.2,newPunch);
   const a=tz.acts[want];
-  if(a){if(want==='Run')a.timeScale=sp/6.2*1.15;else if(want==='Walk')a.timeScale=p.climb?1.6:Math.max(.6,sp/2.6)*(p.crouch?.7:1);else if(want==='Punch')a.timeScale=a.getClip().duration/.32;else if(want==='Roll')a.timeScale=a.getClip().duration/.45;else a.timeScale=1;
-    if(want==='Jump'&&p.swing){a.paused=false;a.time=a.getClip().duration*.35;a.paused=true}else if(want==='Jump'){a.paused=false}
-    if(want==='PickUp'){if(a.time>a.getClip().duration*.45){a.time=a.getClip().duration*.45;a.paused=true}}else if(tz.acts.PickUp)tz.acts.PickUp.paused=false}
+  if(a){const d=a.getClip().duration;a.timeScale=want==='Jog_Fwd_Loop'?sp/5:want==='Sprint_Loop'?sp/8:want==='Walk_Loop'?Math.max(.6,sp/1.8):want.startsWith('Punch')?d/.36:want==='Roll'?d/.45:want==='Crouch_Fwd_Loop'&&p.climb?1.6:1}
   tz.mixer.update(dt);
-  // poses the pack does not include: hanging from a vine, hugging a trunk
-  const B=tz.bones;if(p.swing||p.climb){const k=p.climb?Math.sin(t*6)*.35:0;if(B.uaL)B.uaL.rotation.x+=-2.6+k;if(B.uaR)B.uaR.rotation.x+=-2.6-k;if(B.laL)B.laL.rotation.x*=.3;if(B.laR)B.laR.rotation.x*=.3}
-  if(p.swing&&B.hips)B.hips.rotation.x+=-p.swing.a*.5;
-  if(p.crouch&&sp>.4&&B.hips){B.hips.position.y*=.8}
-  if(p.sleep>0){pm.rotation.z=0}
+  // poses the library does not include: hanging from a vine, hugging a trunk
+  const B=tz.bones;if((p.swing||p.climb)&&B.upperarm_l&&B.upperarm_r){const k=p.climb?Math.sin(t*6)*.3:0;tzRaiseArm(B.upperarm_l,1,k);tzRaiseArm(B.upperarm_r,-1,-k);if(B.lowerarm_l)B.lowerarm_l.quaternion.slerp(B.lowerarm_l.userData.rest||(B.lowerarm_l.userData.rest=B.lowerarm_l.quaternion.clone()),.6);if(B.lowerarm_r)B.lowerarm_r.quaternion.slerp(B.lowerarm_r.userData.rest||(B.lowerarm_r.userData.rest=B.lowerarm_r.quaternion.clone()),.6)}
+  if(p.swing&&B.pelvis)B.pelvis.rotateX(-p.swing.a*.4);
   pm.visible=p.relief>0?Math.floor(t*8)%2===0:!(p.invuln>.6&&Math.floor(t*20)%2);
   if(tzAttach.spear)tzAttach.spear.visible=p.inv.spears>0;
   for(const v of level.vines){const sw=Math.sin(t*1.1+v.ph)*.03*(1+weather.wind/25);if(p.swing&&p.swing.vine===v){const s=p.swing,dx=Math.sin(s.dir),dz=Math.cos(s.dir);const dir=new T.Vector3(dx*Math.sin(s.a),-Math.cos(s.a),dz*Math.sin(s.a));v.g.quaternion.setFromUnitVectors(new T.Vector3(0,-1,0),dir);v.rope.scale.y=(s.L+.1)/v.len}else{v.g.rotation.set(sw,0,sw*.7);v.rope.scale.y=1}}}
+// points an upper arm straight up in world space (independent of the bone's own axes)
+const _qa=new T.Quaternion(),_qb=new T.Quaternion(),_va=new T.Vector3(),_vb=new T.Vector3(),_vc=new T.Vector3();
+function tzRaiseArm(bone,side,wobble){const child=bone.children.find(c=>c.isBone);if(!child)return;bone.updateMatrixWorld(true);
+  bone.getWorldPosition(_va);child.getWorldPosition(_vb);const cur=_vb.sub(_va).normalize();const want=_vc.set(Math.sin(pm.rotation.y)*.15+side*.12*Math.cos(pm.rotation.y),1,Math.cos(pm.rotation.y)*.15-side*.12*Math.sin(pm.rotation.y)).normalize();
+  _qa.setFromUnitVectors(cur,want);bone.getWorldQuaternion(_qb);const parentQ=new T.Quaternion();bone.parent.getWorldQuaternion(parentQ);
+  const worldNew=_qa.multiply(_qb);bone.quaternion.copy(parentQ.invert().multiply(worldNew));if(wobble)bone.rotateX(wobble)}
+
 // ---------- animated animals ----------
 const MODEL_FOR={hyena:['wolf',.3],piglet:['deer',.33]};
 function makeModelCreature(type){const [n,s]=MODEL_FOR[type];const g=ASSET.gltf[n];const root=T.SkeletonUtils.clone(g.scene);root.scale.setScalar(s);
