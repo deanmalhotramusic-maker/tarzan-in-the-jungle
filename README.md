@@ -30,6 +30,7 @@ Open `index.html` in a browser, or turn on GitHub Pages for this repo (Settings 
 ## What's in this version
 
 - Full 3D third-person world: realistic lighting with soft shadows, a sky with moving clouds, reflective water, textured ground and bark, wind-blown grass, leafy trees, palms, ferns, flowers, birds and butterflies
+- A realistic animated Tarzan (idle, walk, jog, sprint, jump, punches, roll, crouch, swim and more) with long hair
 - Animated 3D animals (wolf-style hyenas and deer) and photo-scanned ground, bark and rock textures, lit by a real rainforest sky image (Medium and High)
 - Graphics setting (Auto / Low / Medium / High) in Settings; Auto lowers itself if a phone struggles
 - Six zones: Ape Village, Dense Forest, Riverbank, Swamp, Rocky Cliffs, Ancient Ruins
@@ -55,6 +56,8 @@ Everything is in `index.html`: plain JavaScript with [three.js](https://threejs.
 ## Credits
 
 All third-party assets are CC0 (public domain):
+
+- Tarzan's body, hair and animations (`models/tarzan_*.glb`): [Quaternius](https://quaternius.com), Universal Base Characters and Universal Animation Library
 
 - 3D animal models and animations (`models/wolf.glb`, `models/deer.glb`): [Quaternius](https://quaternius.com), Ultimate Animated Animal Pack
 - Photo-scanned textures (`textures/grass*`, `mud*`, `rock*`, `bark*`): [Poly Haven](https://polyhaven.com) — Leafy Grass, Brown Mud Leaves 01, Rock Face, Bark Brown 02
