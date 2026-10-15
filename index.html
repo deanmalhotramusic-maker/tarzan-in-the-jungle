@@ -261,6 +261,9 @@ body.touch #toast{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 34%)}
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/RGBELoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/utils/SkeletonUtils.js"></script>
 <script>
 (()=>{
 "use strict";
@@ -540,7 +543,14 @@ function buildWorld(){
     if(sl>1.1||Math.hypot(x,z)>152)c.lerp(rock,clamp((sl-1.1)*.8+(Math.hypot(x,z)>152?.8:0),0,1));
     c.offsetHSL(0,0,N(x*2.3,z*2.9)*.035);c.convertSRGBToLinear();cols[i*3]=c.r;cols[i*3+1]=c.g;cols[i*3+2]=c.b}
   geo.setAttribute('color',new T.BufferAttribute(cols,3));geo.computeVertexNormals();
-  let tmat;if(Q.std){TX.ground.repeat.set(90,90);TX.groundBump.repeat.set(90,90);tmat=new T.MeshStandardMaterial({vertexColors:true,map:TX.ground,bumpMap:TX.groundBump,bumpScale:.045,roughness:.95,metalness:0})}else tmat=new T.MeshLambertMaterial({vertexColors:true,flatShading:true});
+  {const spl=new Float32Array(pos.count*3),tint=new Float32Array(pos.count*3),tc=new T.Color();const ZT={village:'#e8e2c8',forest:'#c8dcae',river:'#dce4c8',swamp:'#b0b480',cliffs:'#e0dcd4',ruins:'#dcd4b8'};
+    for(let i=0;i<pos.count;i++){const x=pos.getX(i),z=pos.getZ(i),h=pos.getY(i),zid=zoneIdAt(x,z);const sl=Math.abs(hRaw(x+1.5,z)-h)+Math.abs(hRaw(x,z+1.5)-h);const r=Math.hypot(x,z);
+      let rock=clamp((sl-.8)*1.1,0,1)+(zid==='cliffs'?.35:0)+(r>150?1:0)+(zid==='ruins'?.12:0);
+      let mud=Math.max(clamp((2.4-trailDist(x,z))/1.4,0,1),clamp((.6-h)*1.4,0,1),zid==='swamp'?.55:0,sstep(14,5,Math.hypot(x-VC.x,z-VC.z))*.8);
+      rock=clamp(rock,0,1);mud=clamp(mud,0,1-rock);const grass=Math.max(0,1-rock-mud);spl[i*3]=grass;spl[i*3+1]=mud;spl[i*3+2]=rock;
+      tc.set(ZT[zid]);tc.offsetHSL(0,0,N(x*.7,z*.7)*.05);tc.convertSRGBToLinear();tint[i*3]=tc.r;tint[i*3+1]=tc.g;tint[i*3+2]=tc.b}
+    geo.setAttribute('splat',new T.BufferAttribute(spl,3));W.terrGeo=geo;W.terrTint=tint}
+  let tmat;if(Q.std){TX.ground.repeat.set(90,90);TX.groundBump.repeat.set(90,90);tmat=makeTerrainMaterial()}else tmat=new T.MeshLambertMaterial({vertexColors:true,flatShading:true});
   const terr=new T.Mesh(geo,tmat);terr.receiveShadow=true;grp.add(terr);
   // water
   W.water=makeWater(SZ);grp.add(W.water);
@@ -557,7 +567,7 @@ function buildWorld(){
   const broad=W.trees.filter(t=>t.kind!=='palm'),palms=W.trees.filter(t=>t.kind==='palm');
   const trunkMat=Q.std?(TX.bark.repeat.set(2,5),TX.barkBump.repeat.set(2,5),new T.MeshStandardMaterial({map:TX.bark,bumpMap:TX.barkBump,bumpScale:.08,roughness:.95,metalness:0})):M(0xffffff);
   const tg=new T.CylinderGeometry(.62,1,1,Q.std?10:7,4);tg.translate(0,.5,0);{const p=tg.attributes.position;for(let i=0;i<p.count;i++){const y=p.getY(i);if(y<.08){p.setX(i,p.getX(i)*1.5);p.setZ(i,p.getZ(i)*1.5)}}tg.computeVertexNormals()}
-  const tm=new T.InstancedMesh(tg,trunkMat,broad.length);
+  const tm=new T.InstancedMesh(tg,trunkMat,broad.length);W.trunkMeshes=[tm];
   broad.forEach((t,i)=>{o.position.set(t.x,t.y-.3,t.z);o.rotation.set(0,R()*6,0);o.scale.set(t.r,t.H,t.r);o.updateMatrix();tm.setMatrixAt(i,o.matrix);col.set(t.kind==='swamp'?'#8a8070':t.kind==='ruins'?'#a89a88':'#ffffff').offsetHSL(0,0,(R()-.5)*.08).convertSRGBToLinear();tm.setColorAt(i,col);t.top=t.y+t.H-1});
   // canopy: dark leafy cores plus wind-blown leaf cards
   const cg=new T.IcosahedronGeometry(1,Q.std?1:0);const cm=new T.InstancedMesh(cg,Q.std?M(0xffffff,{roughness:.9}):M(0xffffff,{flatShading:true}),broad.length*3);
@@ -567,7 +577,7 @@ function buildWorld(){
       for(let q=0;q<Q.leaf/3;q++){const th=R()*6.283,ph=Math.acos(R()*1.6-.6),rr=s*(.5+R()*.4);cards.push([cx+Math.sin(ph)*Math.cos(th)*rr,cy+Math.cos(ph)*rr*.7,cz+Math.sin(ph)*Math.sin(th)*rr,th,2.6+R()*1.6,t.kind])}}});
   // palms: curved trunk + drooping fronds
   if(palms.length){const curve=new T.CatmullRomCurve3([new T.Vector3(0,0,0),new T.Vector3(.08,.35,0),new T.Vector3(.25,.7,0),new T.Vector3(.5,1,0)]);const ptg=new T.TubeGeometry(curve,10,.09,8,false);{const p=ptg.attributes.position;for(let i=0;i<p.count;i++){}}
-    const pm2=new T.InstancedMesh(ptg,trunkMat,palms.length);const fg=new T.PlaneGeometry(1,.28,8,1);{const p=fg.attributes.position;for(let i=0;i<p.count;i++){const x=p.getX(i)+.5;p.setX(i,x);p.setY(i,-x*x*.55)}fg.computeVertexNormals()}
+    const pm2=new T.InstancedMesh(ptg,trunkMat,palms.length);W.trunkMeshes.push(pm2);const fg=new T.PlaneGeometry(1,.28,8,1);{const p=fg.attributes.position;for(let i=0;i<p.count;i++){const x=p.getX(i)+.5;p.setX(i,x);p.setY(i,-x*x*.55)}fg.computeVertexNormals()}
     const fm=new T.InstancedMesh(fg,leafMat(TX.palm,.04),palms.length*9);let fi=0;
     palms.forEach((t,i)=>{const yaw=R()*6.28,S2=t.H;o.position.set(t.x,t.y-.2,t.z);o.rotation.set(0,yaw,0);o.scale.set(S2*.32,S2,S2*.32);o.updateMatrix();pm2.setMatrixAt(i,o.matrix);col.set('#d8c8b0').offsetHSL(0,0,(R()-.5)*.08).convertSRGBToLinear();pm2.setColorAt(i,col);
       const top=new T.Vector3(.5*S2*.32,S2,0).applyAxisAngle(new T.Vector3(0,1,0),yaw);t.topX=t.x+top.x;t.topZ=t.z+top.z;t.top=t.y+S2-.6;
@@ -622,11 +632,11 @@ function buildWorld(){
   const rocks=[];for(let i=0;i<500&&rocks.length<130;i++){const x=(R()-.5)*300,z=(R()-.5)*300;const zid=zoneIdAt(x,z);if(zid!=='cliffs'&&zid!=='ruins'&&R()>.15)continue;const h=hRaw(x,z);if(h<0||Math.hypot(x,z)>150)continue;rocks.push([x,h,z,.5+R()*1.6])}
   const rg=new T.DodecahedronGeometry(1,Q.std?1:0);{const p=rg.attributes.position;for(let i=0;i<p.count;i++){const k=1+(hash2(p.getX(i)*3,p.getZ(i)*3+p.getY(i))-.5)*.35;p.setXYZ(i,p.getX(i)*k,p.getY(i)*k,p.getZ(i)*k)}rg.computeVertexNormals()}
   const rmat=Q.std?(TX.rock.repeat.set(2,2),new T.MeshStandardMaterial({map:TX.rock,roughness:.92,metalness:0,flatShading:true})):M(0xffffff,{flatShading:true});
-  const rm=new T.InstancedMesh(rg,rmat,rocks.length);rocks.forEach((r,i)=>{o.position.set(r[0],r[1]+r[3]*.3,r[2]);o.rotation.set(R()*3,R()*3,R()*3);o.scale.set(r[3],r[3]*.7,r[3]);o.updateMatrix();rm.setMatrixAt(i,o.matrix);col.set(Q.std?'#d8d0c0':'#8a8270').offsetHSL(0,0,(R()-.5)*.1).convertSRGBToLinear();rm.setColorAt(i,col);if(r[3]>1.1)W.solids.push({x:r[0],z:r[2],r:r[3]*.9})});
+  const rm=new T.InstancedMesh(rg,rmat,rocks.length);W.rockMesh=rm;rocks.forEach((r,i)=>{o.position.set(r[0],r[1]+r[3]*.3,r[2]);o.rotation.set(R()*3,R()*3,R()*3);o.scale.set(r[3],r[3]*.7,r[3]);o.updateMatrix();rm.setMatrixAt(i,o.matrix);col.set(Q.std?'#d8d0c0':'#8a8270').offsetHSL(0,0,(R()-.5)*.1).convertSRGBToLinear();rm.setColorAt(i,col);if(r[3]>1.1)W.solids.push({x:r[0],z:r[2],r:r[3]*.9})});
   rm.castShadow=Q.shadows;rm.receiveShadow=true;rm.instanceMatrix.needsUpdate=true;rm.instanceColor.needsUpdate=true;grp.add(rm);
   // logs (hiding)
   const logMat=Q.std?new T.MeshStandardMaterial({map:TX.bark,bumpMap:TX.barkBump,bumpScale:.08,roughness:.95,color:LIN('#c8b8a0')}):M(0x5a3d26);
-  for(let i=0;i<14;i++){let x,z,h,tries=0;do{x=(R()-.5)*260;z=(R()-.5)*260;h=hRaw(x,z);tries++}while((h<.4||zoneIdAt(x,z)==='village'||zoneIdAt(x,z)==='cliffs')&&tries<30);const a=R()*3;const L=mesh(G('log',()=>new T.CylinderGeometry(.55,.6,4,Q.std?12:7)),logMat);L.rotation.set(0,a,Math.PI/2);L.position.set(x,h+.45,z);L.receiveShadow=true;grp.add(L);W.logs.push({x,z,r:2})}
+  for(let i=0;i<14;i++){let x,z,h,tries=0;do{x=(R()-.5)*260;z=(R()-.5)*260;h=hRaw(x,z);tries++}while((h<.4||zoneIdAt(x,z)==='village'||zoneIdAt(x,z)==='cliffs')&&tries<30);const a=R()*3;const L=mesh(G('log',()=>new T.CylinderGeometry(.55,.6,4,Q.std?12:7)),logMat);L.rotation.set(0,a,Math.PI/2);L.position.set(x,h+.45,z);L.receiveShadow=true;grp.add(L);(W.logMeshes=W.logMeshes||[]).push(L);W.logs.push({x,z,r:2})}
   // village: huts, nest, elder
   const roofMat=Q.std?new T.MeshStandardMaterial({map:TX.thatch,roughness:.95,metalness:0}):M(0xb59a52);const wallMat=Q.std?new T.MeshStandardMaterial({map:TX.bark,roughness:.95,color:LIN('#d8b890')}):M(0x6a4a2c);
   [[-15,118],[13,123],[-4,96],[17,100]].forEach(([x,z])=>{const g=new T.Group();const y=hRaw(x,z);g.position.set(x,y,z);const w=mesh(G('hutw',()=>new T.CylinderGeometry(2.6,2.8,2.4,14)),wallMat);w.position.y=1.2;const r=mesh(G('hutr',()=>new T.ConeGeometry(3.7,2.8,14,2)),roofMat);r.position.y=3.7;const d=box(1.2,1.8,.3,'#2a1a10');d.position.set(0,.9,2.62);
@@ -637,8 +647,8 @@ function buildWorld(){
   W.baby={x:-100,z:-16,found:false,home:false};{const b=makeApe(.55,'#6b5d50');b.position.set(W.baby.x,hRaw(W.baby.x,W.baby.z),W.baby.z);grp.add(b);W.babyMesh=b}
   // ruins and temple
   const stoneMat=Q.std?(()=>{const t=TX.rock.clone();t.needsUpdate=true;t.repeat.set(1,2);return new T.MeshStandardMaterial({map:t,roughness:.9,color:LIN('#d8d0b0')})})():M(0x9a9478);
-  for(let i=0;i<34;i++){const x=(R()-.5)*190,z=-118-R()*30;if(Math.hypot(x,z+150)<11||Math.hypot(x,z)>148)continue;const h=hRaw(x,z),hh=2+R()*5;const p=mesh(new T.BoxGeometry(1.1,hh,1.1),stoneMat);p.position.set(x,h+hh/2-.2,z);p.rotation.y=R();if(R()<.4)p.rotation.z=(R()-.5)*.4;p.receiveShadow=true;grp.add(p);W.solids.push({x,z,r:.9});if(R()<.5){const cap=mesh(G('cap',()=>new T.BoxGeometry(1.7,.4,1.7)),stoneMat);cap.position.set(x,h+hh,z);grp.add(cap)}}
-  {const ty=hRaw(0,-152);[[16,0],[12,2],[8,4],[4,6]].forEach(([s,y])=>{const b=mesh(new T.BoxGeometry(s,2,s),stoneMat);b.position.set(0,ty+y+1-.3,-152);b.receiveShadow=true;grp.add(b)});W.solids.push({x:0,z:-152,r:8.2})}
+  for(let i=0;i<34;i++){const x=(R()-.5)*190,z=-118-R()*30;if(Math.hypot(x,z+150)<11||Math.hypot(x,z)>148)continue;const h=hRaw(x,z),hh=2+R()*5;const p=mesh(new T.BoxGeometry(1.1,hh,1.1),stoneMat);p.position.set(x,h+hh/2-.2,z);p.rotation.y=R();if(R()<.4)p.rotation.z=(R()-.5)*.4;p.receiveShadow=true;grp.add(p);W.solids.push({x,z,r:.9});(W.stoneMeshes=W.stoneMeshes||[]).push(p);if(R()<.5){const cap=mesh(G('cap',()=>new T.BoxGeometry(1.7,.4,1.7)),stoneMat);cap.position.set(x,h+hh,z);grp.add(cap);W.stoneMeshes.push(cap)}}
+  {const ty=hRaw(0,-152);[[16,0],[12,2],[8,4],[4,6]].forEach(([s,y])=>{const b=mesh(new T.BoxGeometry(s,2,s),stoneMat);b.position.set(0,ty+y+1-.3,-152);b.receiveShadow=true;grp.add(b);(W.stoneMeshes=W.stoneMeshes||[]).push(b)});W.solids.push({x:0,z:-152,r:8.2})}
   // waterfall into the cliff pool
   {const top=hRaw(92,-13)+.6,c=document.createElement('canvas');c.width=32;c.height=128;const g=c.getContext('2d');for(let y=0;y<128;y+=4){g.fillStyle=`rgba(${200+Math.random()*55|0},${235+Math.random()*20|0},255,${.55+Math.random()*.4})`;g.fillRect(0,y,32,3)}
     const tex=new T.CanvasTexture(c);tex.wrapS=tex.wrapT=T.RepeatWrapping;tex.repeat.set(2,3);const wf=new T.Mesh(new T.PlaneGeometry(6,top+1),new T.MeshBasicMaterial({map:tex,transparent:true,opacity:.9,toneMapped:false}));wf.position.set(92,(top-1)/2,-9.6);grp.add(wf);W.wfTex=tex;W.waterfall={x:92,z:-6};
@@ -647,7 +657,7 @@ function buildWorld(){
   W.caves=[{x:122,z:-46,id:'bat',name:'Bat Cave',open:true},{x:-112,z:-30,id:'serpent',name:"Serpent's Lair",open:false},{x:92,z:-11.2,id:'grotto',name:'Waterfall Grotto',open:false},{x:0,z:-143.6,id:'temple',name:'Ancient Ruins Temple',open:false}];
   const moundMat=Q.std?(()=>{const t=TX.rock.clone();t.needsUpdate=true;t.repeat.set(4,4);return new T.MeshStandardMaterial({map:t,roughness:.95,flatShading:true,color:LIN('#b0a898')})})():M(0x6f685a,{flatShading:true});
   W.caves.forEach(cv2=>{const y=hRaw(cv2.x,cv2.z);const toC=Math.atan2(-cv2.x,-cv2.z);cv2.y=y;cv2.yaw=toC;
-    if(cv2.id!=='temple'&&cv2.id!=='grotto'){const m=mesh(G('mound',()=>new T.IcosahedronGeometry(1,2)),moundMat);m.scale.set(6,5,6);m.position.set(cv2.x-Math.sin(toC)*5,y,cv2.z-Math.cos(toC)*5);m.receiveShadow=true;grp.add(m);W.solids.push({x:m.position.x,z:m.position.z,r:5})}
+    if(cv2.id!=='temple'&&cv2.id!=='grotto'){const m=mesh(G('mound',()=>new T.IcosahedronGeometry(1,2)),moundMat);m.scale.set(6,5,6);m.position.set(cv2.x-Math.sin(toC)*5,y,cv2.z-Math.cos(toC)*5);m.receiveShadow=true;grp.add(m);(W.moundMeshes=W.moundMeshes||[]).push(m);W.solids.push({x:m.position.x,z:m.position.z,r:5})}
     const arch=new T.Mesh(G('arch',()=>new T.CircleGeometry(2.3,16,0,Math.PI)),MB('#050404'));arch.position.set(cv2.x,y-.1,cv2.z);arch.rotation.y=toC;grp.add(arch);
     if(!cv2.open){for(let k=-2;k<=2;k++){const v=box(.12,2.3-Math.abs(k)*.3,.12,'#4f7a32');v.position.set(cv2.x+Math.cos(toC)*k*.7,y+1,cv2.z-Math.sin(toC)*k*.7);grp.add(v)}}
     const lab=new T.Sprite(new T.SpriteMaterial({map:textTex(cv2.name,'#f4ead2',true),depthTest:false,transparent:true,toneMapped:false}));lab.scale.set(6,1.2,1);lab.position.set(cv2.x,y+4.6,cv2.z);lab.visible=false;grp.add(lab);cv2.label=lab});
@@ -727,7 +737,7 @@ function makeTarzan(){const g=new T.Group(),skin='#9c6440',skinD='#8a5636',hair=
   g.userData={hips,head,armL,armR,legL,legR,mane:hairG,spear};g.traverse(m=>{if(m.isMesh)m.castShadow=Q.shadows});return g}
 function makeApe(s,c){const g=new T.Group();const fur=M(c,{roughness:.95});const b=sph(.55,c);b.material=fur;b.scale.set(1,1.1,.85);b.position.y=.75;const h=sph(.33,c);h.material=fur;h.position.set(0,1.55,.1);const f=sph(.22,'#8a7a68');f.scale.set(1,.8,.6);f.position.set(0,1.5,.32);
   const e1=sph(.04,'#111111',8);e1.position.set(.09,1.6,.41);const e2=e1.clone();e2.position.x=-.09;const a1=cyl(.13,.11,1,c);a1.material=fur;a1.position.set(.62,.7,.1);a1.rotation.z=.25;const a2=a1.clone();a2.position.x=-.62;a2.rotation.z=-.25;g.add(b,h,f,e1,e2,a1,a2);g.scale.setScalar(s);g.traverse(m=>{if(m.isMesh){m.castShadow=Q.shadows}});return g}
-function makeCreature(type){const g=new T.Group(),u={};g.userData=u;
+function makeCreature(type){if(MODEL_FOR[type]&&ASSET.gltf[MODEL_FOR[type][0]]&&T.SkeletonUtils)return makeModelCreature(type);const g=new T.Group(),u={};g.userData=u;
   if(type==='hyena'){const fur=M('#a08a58',{roughness:.95});const b=sph(.5,'#a08a58');b.material=fur;b.scale.set(.85,.62,1.3);b.position.y=.78;const hd=sph(.26,'#957d52');hd.material=M('#957d52',{roughness:.95});hd.scale.set(1,.85,1.3);hd.position.set(0,.92,.78);const sn=box(.18,.16,.3,'#4a3a22');sn.position.set(0,.85,1.05);
     const e1=cone(.07,.18,'#3a2a1a',6);e1.position.set(.12,1.15,.7);const e2=e1.clone();e2.position.x=-.12;[[.18,.3],[-.2,.0],[.1,-.3],[-.15,.4]].forEach(([x,z])=>{const s2=sph(.09,'#4a3a22',8);s2.position.set(x,.98,z);g.add(s2)});
     u.eyes=[glow(.035,'#ffe14a'),glow(.035,'#ffe14a')];u.eyes[0].position.set(.1,.98,.98);u.eyes[1].position.set(-.1,.98,.98);u.legs=[];[[.22,.4],[-.22,.4],[.22,-.4],[-.22,-.4]].forEach(([x,z])=>{const l=limb(.62,.07,'#7a6a42');l.position.set(x,.62,z);g.add(l);u.legs.push(l)});
@@ -748,10 +758,126 @@ function makeSpider(){const g=new T.Group(),u={};g.userData=u;const sk=M('#3a1a4
   for(let k=0;k<4;k++)for(const s of[-1,1]){const p=new T.Group();p.position.set(s*.9,0,.9-k*.6);const a=cyl(.11,.09,2,'#2a1238');a.material=sk;a.position.y=1;p.add(a);const kn=new T.Group();kn.position.y=2;const c2=cyl(.09,.04,2.6,'#2a1238');c2.material=sk;c2.position.y=-1.3;kn.add(c2);kn.rotation.z=s*2.2;p.add(kn);p.rotation.z=s*-.9;p.rotation.x=(k-1.5)*.25;g.add(p);u.legs.push(p)}
   g.add(b,ab,mark);g.traverse(m=>{if(m.isMesh)m.castShadow=Q.shadows});return g}
 
+
+// ================= real assets (CC0): animated models, photo-scanned textures, HDRI =================
+// Models: Quaternius (Ultimate Animated Character Pack, Ultimate Animated Animal Pack). Textures and sky: Poly Haven. All CC0.
+const ASSET={tex:{},gltf:{},ready:false};
+const TARZAN_MODEL=false; // the cartoon mannequin looked worse than the hand-built Tarzan; a realistic CC0 body can be dropped in at models/tarzan.glb
+const flatN=(()=>{const d=new Uint8Array([128,128,255,255]);const t=new T.DataTexture(d,1,1,T.RGBAFormat);t.needsUpdate=true;return t})();
+const whiteT=(()=>{const d=new Uint8Array([255,255,255,255]);const t=new T.DataTexture(d,1,1,T.RGBAFormat);t.needsUpdate=true;return t})();
+const terrU={uReady:{value:0},tGrass:{value:whiteT},tMud:{value:whiteT},tRock:{value:whiteT},nGrass:{value:flatN},nMud:{value:flatN},nRock:{value:flatN}};
+function makeTerrainMaterial(){
+  const m=new T.MeshStandardMaterial({vertexColors:true,map:TX.ground,normalMap:flatN,roughness:.95,metalness:0});
+  m.onBeforeCompile=sh=>{Object.assign(sh.uniforms,terrU);
+    sh.vertexShader='attribute vec3 splat;\nvarying vec3 vSplat;\nvarying vec2 vWxz;\n'+sh.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\n vSplat=splat; vWxz=(modelMatrix*vec4(position,1.)).xz;');
+    sh.fragmentShader='uniform float uReady;uniform sampler2D tGrass,tMud,tRock,nGrass,nMud,nRock;\nvarying vec3 vSplat;\nvarying vec2 vWxz;\n'+sh.fragmentShader
+      .replace('#include <map_fragment>',`#include <map_fragment>
+  vec3 sw=vSplat/max(vSplat.x+vSplat.y+vSplat.z,1e-4);
+  if(uReady>.5){vec2 tu=vWxz*.22;
+    vec3 cg=texture2D(tGrass,tu).rgb, cm=texture2D(tMud,tu*1.2+.31).rgb, cr=texture2D(tRock,tu*.5).rgb;
+    // height-aware blend so mud fills the gaps between leaves and rock breaks through grass
+    float hg=dot(cg,vec3(.33)), hm=dot(cm,vec3(.33)), hr=dot(cr,vec3(.33));
+    vec3 bw=max(sw+vec3(hg,hm,hr)*.6-max(max(sw.x+hg*.6,sw.y+hm*.6),sw.z+hr*.6)+.25,0.);bw/=max(bw.x+bw.y+bw.z,1e-4);
+    diffuseColor.rgb=sRGBToLinear(vec4(cg*bw.x+cm*bw.y+cr*bw.z,1.)).rgb;}`)
+      .replace('vec3 mapN = texture2D( normalMap, vUv ).xyz * 2.0 - 1.0;',`vec3 mapN = texture2D( normalMap, vUv ).xyz * 2.0 - 1.0;
+  if(uReady>.5){vec2 tu=vWxz*.22;vec3 sw2=vSplat/max(vSplat.x+vSplat.y+vSplat.z,1e-4);
+    mapN=(texture2D(nGrass,tu).xyz*sw2.x+texture2D(nMud,tu*1.2+.31).xyz*sw2.y+texture2D(nRock,tu*.5).xyz*sw2.z)*2.-1.;}`)};
+  m.customProgramCacheKey=()=>'terrain3';return m}
+function loadAssets(){
+  if(GFX==='low'||!Q.std)return;
+  const tl=new T.TextureLoader();const aniso=Math.min(8,renderer.capabilities.getMaxAnisotropy());
+  const tex=(n,srgb)=>new Promise(r=>tl.load('textures/'+n,t=>{t.wrapS=t.wrapT=T.RepeatWrapping;if(srgb)t.encoding=T.sRGBEncoding;t.anisotropy=aniso;r(t)},undefined,()=>r(null)));
+  Promise.all([tex('grass.jpg',1),tex('grass_n.jpg'),tex('mud.jpg',1),tex('mud_n.jpg'),tex('rock.jpg',1),tex('rock_n.jpg'),tex('bark.jpg',1),tex('bark_n.jpg')]).then(([g,gn,m,mn,r,rn,b,bn])=>{
+    if(!g||!m||!r)return;Object.assign(ASSET.tex,{g,gn,m,mn,r,rn,b,bn});ASSET.ready=true;applyTextures()});
+  if(T.RGBELoader)new T.RGBELoader().setDataType(T.UnsignedByteType).load('textures/sky.hdr',hdr=>{const pm2=new T.PMREMGenerator(renderer);ASSET.env=pm2.fromEquirectangular(hdr).texture;hdr.dispose();pm2.dispose();scene.environment=ASSET.env;skyT2=0},undefined,()=>{});
+  if(T.GLTFLoader){const gl=new T.GLTFLoader();['wolf','deer'].concat(TARZAN_MODEL?['tarzan']:[]).forEach(n=>gl.load('models/'+n+'.glb',g=>{ASSET.gltf[n]=g;onModel(n)},undefined,e=>console.warn('model',n,e)))}
+}
+function photoMat(base,map,nmap,rep,extra){const t=map.clone(),n=nmap?nmap.clone():null;t.needsUpdate=true;t.repeat.set(rep[0],rep[1]);if(n){n.needsUpdate=true;n.repeat.set(rep[0],rep[1])}
+  return new T.MeshStandardMaterial(Object.assign({map:t,normalMap:n||undefined,roughness:.92,metalness:0},extra||{}))}
+function applyTextures(){const A=ASSET.tex,W=worldLevel;if(!ASSET.ready)return;
+  terrU.tGrass.value=A.g;terrU.tMud.value=A.m;terrU.tRock.value=A.r;terrU.nGrass.value=A.gn||flatN;terrU.nMud.value=A.mn||flatN;terrU.nRock.value=A.rn||flatN;terrU.uReady.value=1;
+  if(!W)return;
+  if(W.terrGeo&&W.terrTint&&!W.tintApplied){W.terrGeo.attributes.color.array.set(W.terrTint);W.terrGeo.attributes.color.needsUpdate=true;W.tintApplied=true}
+  const swap=(mesh,mat)=>{if(mesh)mesh.material=mat};
+  if(A.b){const bark=photoMat(null,A.b,A.bn,[1.5,4],{});W.trunkMeshes&&W.trunkMeshes.forEach(m=>swap(m,bark));const logM=photoMat(null,A.b,A.bn,[2,1],{color:LIN('#d8c8b8')});W.logMeshes&&W.logMeshes.forEach(m=>swap(m,logM))}
+  const rock=photoMat(null,A.r,A.rn,[1,1],{});if(W.rockMesh)W.rockMesh.material=rock;
+  const stone=photoMat(null,A.r,A.rn,[1,2],{color:LIN('#e8e0c8')});W.stoneMeshes&&W.stoneMeshes.forEach(m=>swap(m,stone));
+  const mound=photoMat(null,A.r,A.rn,[3,3],{color:LIN('#c8c0b0')});W.moundMeshes&&W.moundMeshes.forEach(m=>swap(m,mound));
+}
+function caveRockMat(fallback){if(!ASSET.ready)return fallback;return photoMat(null,ASSET.tex.r,ASSET.tex.rn,[8,1],{color:LIN('#8a7a78')})}
+// ---------- animated Tarzan ----------
+let tz=null;
+function onModel(n){if(n==='tarzan')setupTarzan();else{const g=ASSET.gltf[n];
+  g.scene.traverse(o=>{if(!o.isMesh)return;const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>{m.roughness=.85;m.metalness=0;
+    if(n==='wolf'){if(m.name==='Main')m.color.set('#8a7048').convertSRGBToLinear();if(m.name==='Main_Light')m.color.set('#c4a874').convertSRGBToLinear()}})})}}
+function setupTarzan(){const g=ASSET.gltf.tarzan;if(!g||tz||!pm)return;const MS=.575;const root=g.scene;root.scale.setScalar(MS);
+  const skin=LIN('#9c6440');
+  root.traverse(o=>{if(o.isMesh){o.castShadow=Q.shadows;o.receiveShadow=true;o.frustumCulled=false;const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>{if(m.name==='Skin'){m.color.copy(skin);m.roughness=.58;m.metalness=0}else{m.roughness=.5;m.metalness=0}})}});
+  const B=n=>root.getObjectByName(n);const bones={hips:B('Hips'),head:B('Head'),torso:B('Torso'),uaL:B('UpperArm.L'),uaR:B('UpperArm.R'),laL:B('LowerArm.L'),laR:B('LowerArm.R'),ulL:B('UpperLeg.L'),ulR:B('UpperLeg.R')};
+  // attachments built in metres, then scaled into the model's units
+  const inv=1/MS;
+  if(bones.hips){const lc=new T.Group();const skirt=mesh(lathe([[.2,.1],[.21,0],[.24,-.14],[.26,-.2]],16),M('#5e3618',{roughness:.95,side:T.DoubleSide}));const f1=box(.24,.32,.035,'#4e2c12');f1.position.set(0,-.2,.2);const f2=f1.clone();f2.position.z=-.2;lc.add(skirt,f1,f2);lc.scale.setScalar(inv);lc.position.set(0,0,0);bones.hips.add(lc);tzAttach.loin=lc}
+  if(bones.head){const hg=new T.Group();const hm=M('#1e1008',{roughness:.7});for(let k=0;k<11;k++){const st=cone(.055,.55+Math.random()*.2,'#1e1008',6);st.material=hm;st.rotation.x=Math.PI+.35;st.position.set((k-5)*.035,-.15,-.13-Math.abs(k-5)*.004);st.rotation.z=(k-5)*.06;hg.add(st)}
+    const cap=sph(.17,'#1e1008');cap.material=hm;cap.scale.set(1.05,.75,1.1);cap.position.set(0,.12,-.03);hg.add(cap);hg.scale.setScalar(inv);hg.position.set(0,.2*inv*.5,0);bones.head.add(hg);tzAttach.hair=hg}
+  if(bones.torso){const sp=cyl(.022,.022,1.7,'#a87a4a',6);sp.rotation.z=.25;sp.scale.setScalar(inv);sp.position.set(0,.1*inv,-.2*inv);bones.torso.add(sp);tzAttach.spear=sp}
+  const mixer=new T.AnimationMixer(root);const acts={};g.animations.forEach(c=>{acts[c.name]=mixer.clipAction(c)});
+  ['Jump','Punch','Roll','RecieveHit','PickUp','Death'].forEach(n=>{if(acts[n]){acts[n].setLoop(T.LoopOnce);acts[n].clampWhenFinished=true}});
+  const wrap=new T.Group();wrap.add(root);scene.remove(pm);pm=wrap;scene.add(pm);
+  tz={root,mixer,acts,cur:null,bones};pm.userData={model:true};playTz('Idle',0);
+}
+const tzAttach={};
+function playTz(name,fade=.18,from0){if(!tz)return;const a=tz.acts[name];if(!a)return;if(tz.cur===name&&!from0)return;const prev=tz.acts[tz.cur];a.reset();a.enabled=true;a.setEffectiveWeight(1);a.play();if(prev&&prev!==a)prev.crossFadeTo(a,fade,false);tz.cur=name}
+function animTarzanModel(dt){const p=player,t=p.anim;pm.position.set(p.x,p.y,p.z);pm.rotation.set(0,p.yaw,0);
+  const sp=Math.hypot(p.vx,p.vz);let want='Idle',ts=1;
+  if(p.sleep>0)want='Defeat';
+  else if(p.swing)want='Jump';
+  else if(p.climb)want='Walk';
+  else if(p.roll>0)want='Roll';
+  else if(p.punch>0)want='Punch';
+  else if((p.hitT||0)>0)want='RecieveHit';
+  else if(!p.onGround)want='Jump';
+  else if(p.relief>0||p.crouch&&sp<.5)want='PickUp';
+  else if(sp>4.2)want='Run';
+  else if(sp>.4)want='Walk';
+  const restart=(want==='Punch'&&tz.lastPunch!==p.punchId)||(want==='Jump'&&tz.cur!=='Jump');
+  if(want==='Punch')tz.lastPunch=p.punchId;
+  playTz(want,want==='Punch'||want==='Roll'?.08:.18,restart);
+  const a=tz.acts[want];
+  if(a){if(want==='Run')a.timeScale=sp/6.2*1.15;else if(want==='Walk')a.timeScale=p.climb?1.6:Math.max(.6,sp/2.6)*(p.crouch?.7:1);else if(want==='Punch')a.timeScale=a.getClip().duration/.32;else if(want==='Roll')a.timeScale=a.getClip().duration/.45;else a.timeScale=1;
+    if(want==='Jump'&&p.swing){a.paused=false;a.time=a.getClip().duration*.35;a.paused=true}else if(want==='Jump'){a.paused=false}
+    if(want==='PickUp'){if(a.time>a.getClip().duration*.45){a.time=a.getClip().duration*.45;a.paused=true}}else if(tz.acts.PickUp)tz.acts.PickUp.paused=false}
+  tz.mixer.update(dt);
+  // poses the pack does not include: hanging from a vine, hugging a trunk
+  const B=tz.bones;if(p.swing||p.climb){const k=p.climb?Math.sin(t*6)*.35:0;if(B.uaL)B.uaL.rotation.x+=-2.6+k;if(B.uaR)B.uaR.rotation.x+=-2.6-k;if(B.laL)B.laL.rotation.x*=.3;if(B.laR)B.laR.rotation.x*=.3}
+  if(p.swing&&B.hips)B.hips.rotation.x+=-p.swing.a*.5;
+  if(p.crouch&&sp>.4&&B.hips){B.hips.position.y*=.8}
+  if(p.sleep>0){pm.rotation.z=0}
+  pm.visible=p.relief>0?Math.floor(t*8)%2===0:!(p.invuln>.6&&Math.floor(t*20)%2);
+  if(tzAttach.spear)tzAttach.spear.visible=p.inv.spears>0;
+  for(const v of level.vines){const sw=Math.sin(t*1.1+v.ph)*.03*(1+weather.wind/25);if(p.swing&&p.swing.vine===v){const s=p.swing,dx=Math.sin(s.dir),dz=Math.cos(s.dir);const dir=new T.Vector3(dx*Math.sin(s.a),-Math.cos(s.a),dz*Math.sin(s.a));v.g.quaternion.setFromUnitVectors(new T.Vector3(0,-1,0),dir);v.rope.scale.y=(s.L+.1)/v.len}else{v.g.rotation.set(sw,0,sw*.7);v.rope.scale.y=1}}}
+// ---------- animated animals ----------
+const MODEL_FOR={hyena:['wolf',.3],piglet:['deer',.33]};
+function makeModelCreature(type){const [n,s]=MODEL_FOR[type];const g=ASSET.gltf[n];const root=T.SkeletonUtils.clone(g.scene);root.scale.setScalar(s);
+  root.traverse(o=>{if(o.isMesh){o.castShadow=Q.shadows;o.frustumCulled=false}});
+  const wrap=new T.Group();wrap.add(root);const mixer=new T.AnimationMixer(root);const acts={};g.animations.forEach(c=>{acts[c.name]=mixer.clipAction(c)});
+  ['Attack','Death','Idle_HitReact1'].forEach(k=>{if(acts[k]){acts[k].setLoop(T.LoopOnce);acts[k].clampWhenFinished=true}});
+  wrap.userData={model:true,mixer,acts,cur:null};playCr(wrap,'Idle',0);
+  if(type==='hyena'){const ey=[glow(.035,'#ffe14a'),glow(.035,'#ffe14a')];ey[0].position.set(.1,.72,.72);ey[1].position.set(-.1,.72,.72);wrap.add(...ey);wrap.userData.eyes=ey}
+  return wrap}
+function playCr(m,name,fade=.2,from0){const u=m.userData,a=u.acts[name];if(!a||u.cur===name&&!from0)return;const prev=u.acts[u.cur];a.reset();a.play();if(prev&&prev!==a)prev.crossFadeTo(a,fade,false);u.cur=name}
+function animModelCreature(e,dt,isPrey){const m=e.mesh,u=m.userData;let want='Idle',ts=1;
+  if(e.dead){want='Death'}
+  else if(isPrey){want=e.state==='flee'?'Gallop':(e.walk?'Walk':(e.t%3<1.4?'Eating':'Idle'))}
+  else if(e.hurt>0)want='Idle_HitReact1';
+  else if(e.cd>.9&&e.state==='chase'&&Math.hypot(player.x-e.x,player.z-e.z)<2.4)want='Attack';
+  else if(e.state==='chase'||e.state==='flee')want='Gallop';
+  else if(e.state==='patrol'&&!e.idle)want='Walk';
+  playCr(m,want,.2);const a=u.acts[want];if(a)a.timeScale=want==='Gallop'?1.1:want==='Walk'?1.2:1;u.mixer.update(dt)}
+
 // ---------- cave (built far from the jungle) ----------
 function buildCave(){
   const C={id:'cave',group:new T.Group(),trees:[],shelves:[],vines:[],grass:[],bushes:[],logs:[],solids:[],items:[],caves:[],boxes:[],shelter:[{x:X0+60,z:0,r:200}]};scene.add(C.group);const g=C.group;
-  const rockM=M(0x5a4a48),floor=new T.Mesh(new T.BoxGeometry(96,1,10),M(0x2e2426));floor.position.set(X0+46,-.5,0);floor.receiveShadow=true;g.add(floor);
+  const rockM=caveRockMat(M(0x5a4a48)),floor=new T.Mesh(new T.BoxGeometry(96,1,10),M(0x2e2426));floor.position.set(X0+46,-.5,0);floor.receiveShadow=true;g.add(floor);
   const wl=new T.Mesh(new T.BoxGeometry(96,9,1),rockM);wl.position.set(X0+46,4,-5.2);const wr=wl.clone();wr.position.z=5.2;const ce=new T.Mesh(new T.BoxGeometry(96,1,11),rockM);ce.position.set(X0+46,7.6,0);const back=new T.Mesh(new T.BoxGeometry(1,9,11),rockM);back.position.set(X0-1.5,4,0);g.add(wl,wr,ce,back);
   const ar=new T.Mesh(new T.CylinderGeometry(16,16,14,18,1,true),M(0x544444,{side:T.BackSide,flatShading:true}));ar.position.set(X0+108,6,0);const af=new T.Mesh(new T.CylinderGeometry(16,16,1,18),M(0x2e2426));af.position.set(X0+108,-.5,0);const ac=new T.Mesh(new T.CylinderGeometry(16,16,1,18),rockM);ac.position.set(X0+108,13,0);g.add(ar,af,ac);
   for(let i=0;i<46;i++){const x=X0+2+Math.random()*92,z=(Math.random()-.5)*9;const s=cone(.25+Math.random()*.3,.8+Math.random()*1.6,0x4a3c3e,5);s.rotation.x=Math.PI;s.position.set(x,7.1-.3,z);g.add(s)}
@@ -781,7 +907,7 @@ function newPlayer(){return{x:SPAWN_PT.x,y:hRaw(SPAWN_PT.x,SPAWN_PT.z),z:SPAWN_P
   m:{hunger:85,thirst:85,bladder:10,warmth:100,energy:90},inv:{spears:3,sticks:0,raw:0,cooked:0,flint:false},buff:{speed:0,strength:0},slow:0,yellCd:0,poison:0,combo:0,grabCd:0,sleep:0,relief:0,anim:0,dropT:0,onShelf:null}}
 function clearEntities(){[...enemies,...prey].forEach(e=>e.mesh&&e.mesh.parent&&e.mesh.parent.remove(e.mesh));projs.forEach(s=>s.mesh&&scene.remove(s.mesh));enemies=[];prey=[];projs=[]}
 function resetGame(){
-  if(!worldLevel){worldLevel=buildWorld()}
+  if(!worldLevel){worldLevel=buildWorld();applyTextures()}
   level=worldLevel;worldLevel.group.visible=true;if(caveLevel)caveLevel.group.visible=false;
   clearEntities();fires.forEach(f=>{scene.remove(f.group);f.light.intensity=0});fires=[];if(bossMesh){scene.remove(bossMesh);bossMesh=null}boss=null;
   worldLevel.items.forEach(it=>{it.alive=true;it.mesh.visible=true});Object.assign(worldLevel.baby,{x:-100,z:-16,found:false,home:false});
@@ -841,12 +967,13 @@ function inputVec(){let f=0,s=0;if(stickVec.on){f=-stickVec.y;s=stickVec.x}else{
   const m=Math.hypot(f,s);if(m>1){f/=m;s/=m}const fy=Math.sin(camYaw),fz=Math.cos(camYaw);return{f,s,x:fy*f-fz*s,z:fz*f+fy*s,mag:Math.min(1,m)}}
 
 // ---------- player ----------
-function hurtPlayer(dmg,fx,fz){const p=player;if(p.invuln>0||p.roll>0)return;p.health-=dmg;p.invuln=.9;const a=Math.atan2(p.x-fx,p.z-fz);p.vx=Math.sin(a)*6;p.vz=Math.cos(a)*6;p.vy=4;p.onGround=false;if(p.swing){p.swing=null;p.grabCd=.5}p.climb=null;shake=.25;sfx.hurt();pop(p.x,p.y+2.1,p.z,'-'+Math.round(dmg),'#ff7a5a');
+function hurtPlayer(dmg,fx,fz){const p=player;if(p.invuln>0||p.roll>0)return;p.health-=dmg;p.hitT=.4;p.invuln=.9;const a=Math.atan2(p.x-fx,p.z-fz);p.vx=Math.sin(a)*6;p.vz=Math.cos(a)*6;p.vy=4;p.onGround=false;if(p.swing){p.swing=null;p.grabCd=.5}p.climb=null;shake=.25;sfx.hurt();pop(p.x,p.y+2.1,p.z,'-'+Math.round(dmg),'#ff7a5a');
   if(p.sleep>0){p.sleep=0;toast('You were attacked in your sleep!')}}
 const strength=()=>player.buff.strength>0?2:1;
 function updatePlayer(dt){
   const p=player,L=level;
-  p.anim+=dt;p.invuln=Math.max(0,p.invuln-dt);p.grabCd=Math.max(0,p.grabCd-dt);p.yellCd=Math.max(0,p.yellCd-dt);p.punch=Math.max(0,p.punch-dt);p.slow=Math.max(0,p.slow-dt);p.dropT=Math.max(0,p.dropT-dt);
+  if(!isFinite(p.x+p.y+p.z+p.vx+p.vy+p.vz)){const g=p.safe||{x:SPAWN_PT.x,y:hRaw(SPAWN_PT.x,SPAWN_PT.z),z:SPAWN_PT.z};Object.assign(p,g,{vx:0,vy:0,vz:0,swing:null,climb:null});console.warn('Recovered Tarzan from an invalid position')}else p.safe={x:p.x,y:p.y,z:p.z};
+  p.anim+=dt;p.hitT=Math.max(0,(p.hitT||0)-dt);p.invuln=Math.max(0,p.invuln-dt);p.grabCd=Math.max(0,p.grabCd-dt);p.yellCd=Math.max(0,p.yellCd-dt);p.punch=Math.max(0,p.punch-dt);p.slow=Math.max(0,p.slow-dt);p.dropT=Math.max(0,p.dropT-dt);
   p.buff.speed=Math.max(0,p.buff.speed-dt);p.buff.strength=Math.max(0,p.buff.strength-dt);p.relief=Math.max(0,p.relief-dt);
   if(p.sleep>0){p.sleep-=dt;p.m.energy=Math.min(100,p.m.energy+28*dt);if(p.sleep<=0){toast('Tarzan wakes up rested.');
       if(isNight()&&L.id==='world'&&zoneIdAt(p.x,p.z)!=='village'&&Math.random()<.4){toast('Hyenas found your camp!');for(let i=0;i<2;i++){const e=addEnemy('hyena',p.x+(i?14:-14),p.z+6);e.state='chase'}}}return}
@@ -894,7 +1021,7 @@ function updatePlayer(dt){
   const inCover=L.grass.some(g2=>Math.hypot(g2.x-p.x,g2.z-p.z)<g2.r)||L.bushes.some(b=>Math.hypot(b.x-p.x,b.z-p.z)<b.r+.4)||L.logs.some(l=>Math.hypot(l.x-p.x,l.z-p.z)<l.r);
   p.hidden=(p.crouch&&inCover)||!!p.onShelf;
   // actions
-  if(pressed.punch&&p.punch<=0){p.punch=.3;p.punchHit=false;noise(.06,.1,3000)}
+  if(pressed.punch&&p.punch<=0){p.punch=.3;p.punchId=(p.punchId||0)+1;p.punchHit=false;noise(.06,.1,3000)}
   if(p.punch>.12&&!p.punchHit){p.punchHit=true;const fx=p.x+Math.sin(p.yaw)*1.1,fz=p.z+Math.cos(p.yaw)*1.1;let hit=false;const dmg=strength()*(p.hidden?2:1);
     for(const e of enemies)if(e.hp>0&&Math.hypot(e.x-fx,e.z-fz)<ENEMY[e.type].reach+.6&&Math.abs(e.y-p.y)<1.8){damageEnemy(e,dmg);hit=true}
     for(const a of prey)if(a.hp>0&&Math.hypot(a.x-fx,a.z-fz)<1.3&&Math.abs(a.y-p.y)<1.5){damagePrey(a,dmg,p.hidden);hit=true}
@@ -993,7 +1120,7 @@ function stepToward(e,tx,tz,spd,dt){const a=Math.atan2(tx-e.x,tz-e.z);e.yaw=a;co
 function updateEnemies(dt){
   const p=player,L=level;
   for(const e of enemies){
-    const d=ENEMY[e.type];e.anim+=dt;e.cd=Math.max(0,e.cd-dt);e.hurt=Math.max(0,e.hurt-dt);
+    if(!isFinite(e.x+e.z+e.y)){e.dead=true;e.hp=0;e.dyT=0;continue}if(e.dead)continue;const d=ENEMY[e.type];e.anim+=dt;e.cd=Math.max(0,e.cd-dt);e.hurt=Math.max(0,e.hurt-dt);
     const dx=p.x-e.x,dz=p.z-e.z,dist=Math.hypot(dx,dz),dy=Math.abs(p.y-e.y);
     const fireNear=fires.some(f=>f.level===L.id&&Math.hypot(f.x-e.x,f.z-e.z)<9);
     if(e.flee>0){e.flee-=dt;e.state='flee'}if(fireNear&&e.type!=='croc'&&e.type!=='bat'&&e.type!=='baby'){e.state='flee';e.flee=Math.max(e.flee,1.5)}
@@ -1021,16 +1148,16 @@ function updateEnemies(dt){
       if(e.type!=='baby'||L.id==='world')e.y=groundAt(e.x,e.z);else e.y=0;
     }
   }
-  enemies=enemies.filter(e=>{if(e.dead){scene.remove(e.mesh);return false}return true});
+  enemies=enemies.filter(e=>{if(e.dead){if(e.mesh.userData.model){if(e.dyT===undefined)e.dyT=1.4;e.dyT-=1/60;if(e.dyT>0)return true}scene.remove(e.mesh);return false}return true});
 }
 function updatePrey(dt){const p=player;
-  for(const a of prey){const d=PREY[a.type];a.t-=dt;const dist=Math.hypot(p.x-a.x,p.z-a.z);
+  for(const a of prey){if(!isFinite(a.x+a.z)){a.dead=true;a.hp=0;a.dyT=0;continue}if(a.dead)continue;const d=PREY[a.type];a.t-=dt;const dist=Math.hypot(p.x-a.x,p.z-a.z);
     if(a.state!=='flee'&&!p.hidden&&dist<13&&p.sleep<=0){a.state='flee';a.t=2.5}
     if(a.state==='flee'){if(stepToward(a,a.x-(p.x-a.x),a.z-(p.z-a.z),d.speed,dt))a.hop+=dt*12;if(a.t<=0&&dist>22)a.state='idle'}
     else if(a.t<=0){a.t=1+Math.random()*2.5;a.wy=Math.random()*6.28;a.walk=Math.random()<.5}
     else if(a.walk){if(stepToward(a,a.x+Math.sin(a.wy)*3,a.z+Math.cos(a.wy)*3,d.speed*.15,dt))a.hop+=dt*6}
     a.y=hRaw(a.x,a.z)}
-  prey=prey.filter(a=>{if(a.dead){scene.remove(a.mesh);return false}return true})}
+  prey=prey.filter(a=>{if(a.dead){if(a.mesh.userData.model){if(a.dyT===undefined)a.dyT=1.4;a.dyT-=1/60;if(a.dyT>0)return true}scene.remove(a.mesh);return false}return true})}
 function updateProjs(dt){const p=player;
   for(const s of projs){s.life-=dt;if(!s.stuck){s.vy-=(s.type==='spear'?11:s.type==='web'?0:14)*dt;s.x+=s.vx*dt;s.y+=s.vy*dt;s.z+=s.vz*dt}
     if(s.type==='spear'){
@@ -1123,6 +1250,7 @@ function updateSkyColors(){const d=sky.day,g=sky.golden,cl=cloudiness();
   if(level.id==='cave'){scene.fog.color.set('#160e12').convertSRGBToLinear();scene.fog.density=.03}
   else{scene.fog.color.copy(cHor).convertSRGBToLinear();scene.fog.density=weather.kind==='fog'?.045:weather.kind==='snow'?.03:weather.rain>.3?.018:isNight()?.011:.0075}
   if(W_waterMat){W_waterMat.uniforms.skyC.value.copy(cHor).lerp(cTop,.35).convertSRGBToLinear()}
+  if(ASSET.env){const k=level.id==='cave'?.08:(.06+.36*d)*(1-cl*.35);scene.traverse(o=>{const ms=o.material;if(!ms)return;(Array.isArray(ms)?ms:[ms]).forEach(m=>{if(m.isMeshStandardMaterial)m.envMapIntensity=k})})}
 }
 function updateLighting(dt){
   const p=player||{x:0,y:0,z:0};const cave=level.id==='cave';
@@ -1134,8 +1262,8 @@ function updateLighting(dt){
   skyU.sunDir.value.copy(sd);skyU.moonDir.value.copy(md);skyU.sunVis.value=d*(1-cl*.85);skyU.sunCol.value.set(sky.golden>.2?'#ffb070':'#fff0d8').convertSRGBToLinear();
   const useMoon=d<.35;const ld=useMoon?md:sd;
   sun.position.set(p.x+ld.x*90,p.y+ld.y*90,p.z+ld.z*90);sun.target.position.set(p.x,p.y,p.z);sun.target.updateMatrixWorld();
-  sun.intensity=cave?0:(useMoon?.35*(1-cl*.6):(.35+1.75*d)*(1-cl*.55));sun.color.set(useMoon?'#9fb4ff':'#fff1d6').lerp(tmpC.set('#ff9a4a'),sky.golden*.6).convertSRGBToLinear();
-  hemi.intensity=cave?.18:.2+.5*d;hemi.color.set(useMoon?'#4a5a8a':'#cfe8ff').convertSRGBToLinear();hemi.groundColor.set(useMoon?'#101418':'#4a5a2a').convertSRGBToLinear();amb.intensity=cave?.25:.06+.06*(1-d);
+  sun.intensity=cave?0:(useMoon?.35*(1-cl*.6):(.35+(ASSET.env?1.45:1.75)*d)*(1-cl*.55));sun.color.set(useMoon?'#9fb4ff':'#fff1d6').lerp(tmpC.set('#ff9a4a'),sky.golden*.6).convertSRGBToLinear();
+  hemi.intensity=(cave?.18:.2+.5*d)*(ASSET.env&&!cave?.55:1);hemi.color.set(useMoon?'#4a5a8a':'#cfe8ff').convertSRGBToLinear();hemi.groundColor.set(useMoon?'#101418':'#4a5a2a').convertSRGBToLinear();amb.intensity=cave?.25:.06+.06*(1-d);
   renderer.toneMappingExposure=cave?1.25:lerp(1.35,1.0,d);
   if(W_waterMat){W_waterMat.uniforms.sunDir.value.copy(ld);W_waterMat.uniforms.sunCol.value.copy(sun.color).multiplyScalar(useMoon?.3:1-cl*.7)}
   dome.position.copy(camera.position);
@@ -1177,7 +1305,7 @@ function updateLife(dt){if(!Q.life||!player)return;const p=player,t=performance.
   life.pollen.visible=day;if(day){life.pollen.position.set(p.x,p.y,p.z);life.pollen.rotation.y=t*.02}}
 
 // ---------- animation of meshes ----------
-function animTarzan(dt){const p=player,u=pm.userData,t=p.anim;pm.position.set(p.x,p.y,p.z);pm.rotation.set(0,p.yaw,0);
+function animTarzan(dt){if(tz){animTarzanModel(dt);return}const p=player,u=pm.userData,t=p.anim;pm.position.set(p.x,p.y,p.z);pm.rotation.set(0,p.yaw,0);
   let la=0,ra=0,ll=0,lr=0,hy=.95,lean=0,eL=-.25,eR=-.25,kL=0,kR=0;
   const sp=Math.hypot(p.vx,p.vz);
   if(p.sleep>0){pm.rotation.z=Math.PI/2;pm.position.y+=.3}
@@ -1195,8 +1323,8 @@ function animTarzan(dt){const p=player,u=pm.userData,t=p.anim;pm.position.set(p.
   u.mane.rotation.x=(sp>.5||p.swing?.6:.1)+Math.sin(t*5)*.06;u.spear.visible=p.inv.spears>0;
   for(const v of level.vines){const sw=Math.sin(t*1.1+v.ph)*.03*(1+weather.wind/25);if(p.swing&&p.swing.vine===v){const s=p.swing,dx=Math.sin(s.dir),dz=Math.cos(s.dir);const dir=new T.Vector3(dx*Math.sin(s.a),-Math.cos(s.a),dz*Math.sin(s.a));v.g.quaternion.setFromUnitVectors(new T.Vector3(0,-1,0),dir);v.rope.scale.y=(s.L+.1)/v.len}else{v.g.rotation.set(sw,0,sw*.7);v.rope.scale.y=1}}}
 
-function animCreatures(){const night=isNight();
-  for(const e of enemies){const m=e.mesh,u=m.userData;m.visible=Math.abs(e.x-player.x)<80&&Math.abs(e.z-player.z)<80;if(!m.visible)continue;m.position.set(e.x,e.y,e.z);m.rotation.y=e.yaw;const a=e.anim;
+function animCreatures(_dt=.016){const night=isNight();
+  for(const e of enemies){const m=e.mesh,u=m.userData;m.visible=Math.abs(e.x-player.x)<80&&Math.abs(e.z-player.z)<80;if(!m.visible)continue;m.position.set(e.x,e.y,e.z);m.rotation.y=e.yaw;if(u.model){if(u.eyes)u.eyes.forEach(x=>x.visible=night);animModelCreature(e,_dt,false);continue}const a=e.anim;
     if(u.legs)u.legs.forEach((l,i)=>l.rotation.x=Math.sin(a*14+(i%2?Math.PI:0)+(i>1?1:0))*.6);
     if(u.seg)u.seg.forEach((s,i)=>s.position.x=Math.sin(a*6-i*.8)*.12);
     if(u.eyes&&e.type==='hyena')u.eyes.forEach(x=>x.visible=night);
@@ -1205,7 +1333,7 @@ function animCreatures(){const night=isNight();
     if(u.arm)u.arm.rotation.x=e.cd>2.2?-2.6:-.3;
     m.scale.setScalar(e.hurt>0?1.15:1);
     if(e.state==='notice'&&!e.mark){e.mark=new T.Sprite(new T.SpriteMaterial({map:textTex('!','#ffd23a'),depthTest:false}));e.mark.position.y=2.2;e.mark.scale.set(.9,.9,1);m.add(e.mark)}if(e.mark)e.mark.visible=e.state==='notice'}
-  for(const a of prey){a.mesh.visible=Math.abs(a.x-player.x)<70&&Math.abs(a.z-player.z)<70;if(!a.mesh.visible)continue;a.mesh.position.set(a.x,a.y+Math.abs(Math.sin(a.hop))*(a.type==='rabbit'?.3:.08),a.z);a.mesh.rotation.y=a.yaw;if(a.mesh.userData.legs)a.mesh.userData.legs.forEach((l,i)=>l.rotation.x=Math.sin(a.hop*2+(i%2?3:0))*.5)}
+  for(const a of prey){a.mesh.visible=Math.abs(a.x-player.x)<70&&Math.abs(a.z-player.z)<70;if(!a.mesh.visible)continue;if(a.mesh.userData.model){a.mesh.position.set(a.x,a.y,a.z);a.mesh.rotation.y=a.yaw;animModelCreature(a,_dt,true);continue}a.mesh.position.set(a.x,a.y+Math.abs(Math.sin(a.hop))*(a.type==='rabbit'?.3:.08),a.z);a.mesh.rotation.y=a.yaw;if(a.mesh.userData.legs)a.mesh.userData.legs.forEach((l,i)=>l.rotation.x=Math.sin(a.hop*2+(i%2?3:0))*.5)}
   const W=worldLevel,B=W.baby;if(level.id==='world'){if(B.found&&!B.home){B.x=lerp(B.x,player.x-Math.sin(player.yaw)*1.6,.05);B.z=lerp(B.z,player.z-Math.cos(player.yaw)*1.6,.05)}const bx=B.home?W.elder.x+2.2:B.x,bz=B.home?W.elder.z+1:B.z;W.babyMesh.position.set(bx,hRaw(bx,bz),bz);
     const q=quests[questIdx];W.elderMark.visible=!!q&&(!questActive||q.prog>=q.need||q.id==='baby'&&B.found);W.elderMark.material.map=W.elderMark.__tex||(W.elderMark.__tex=W.elderMark.material.map);
     W.caves.forEach(c=>c.label.visible=Math.hypot(c.x-player.x,c.z-player.z)<22);if(W.wfTex)W.wfTex.offset.y-=.02}}
@@ -1257,7 +1385,7 @@ function frame(now){
   if(pressed.mute)toggleMute();
   for(const q of parts){q.t-=dt;q.vy-=14*dt;q.m.position.x+=q.vx*dt;q.m.position.y+=q.vy*dt;q.m.position.z+=q.vz*dt;if(q.t<=0)scene.remove(q.m)}parts=parts.filter(q=>q.t>0);
   shake=Math.max(0,shake-dt);
-  if(player&&level){if(mode==='play'||mode==='paused'||mode==='over'){animTarzan(dt);animCreatures();updateCamera(dt)}else{animTarzan(dt);titleCamera(dt)}updateLighting(dt);}
+  if(player&&level){if(mode==='play'||mode==='paused'||mode==='over'){animTarzan(dt);animCreatures(dt);updateCamera(dt)}else{animTarzan(dt);titleCamera(dt)}updateLighting(dt);}
   renderer.render(scene,camera);
   // floating text
   for(const q of pops){q.t-=dt;q.p.y+=1.2*dt;tmpV.copy(q.p).project(camera);const x=(tmpV.x*.5+.5)*innerWidth,y=(-tmpV.y*.5+.5)*innerHeight;q.el.style.transform=`translate(${x}px,${y}px) translate(-50%,-50%)`;q.el.style.opacity=clamp(q.t,0,1);q.el.style.display=tmpV.z<1?'block':'none';if(q.t<=0)q.el.remove()}pops=pops.filter(q=>q.t>0);
@@ -1275,7 +1403,8 @@ function frame(now){
 let skyT=0,wxT=0;
 function respawn(){if(level.id==='cave')exitCave();const keep={maxHealth:player.maxHealth,inv:player.inv};Object.assign(player,newPlayer(),keep);player.health=player.maxHealth;player.inv.spears=Math.max(player.inv.spears,3);score=Math.floor(score*.8);clearEntities();startPlay()}
 
-if(/[?&]debug/.test(location.search))window.__tz={get player(){return player},get level(){return level},get boss(){return boss},get enemies(){return enemies},get prey(){return prey},get fires(){return fires},get quests(){return quests},get world(){return worldLevel},get score(){return score},get mode(){return mode},keys,pressed,enterCave,exitCave,useAction,useHint,buildFire,weather,sky,setCam(y,p){camYaw=y;camPitch=p},renderer,scene,camera};
+loadAssets();
+if(/[?&]debug/.test(location.search))window.__tz={get player(){return player},get level(){return level},get boss(){return boss},get enemies(){return enemies},get prey(){return prey},get fires(){return fires},get quests(){return quests},get world(){return worldLevel},get score(){return score},get mode(){return mode},keys,pressed,enterCave,exitCave,useAction,useHint,buildFire,weather,sky,setCam(y,p){camYaw=y;camPitch=p},renderer,scene,camera,ASSET,get tz(){return tz},addEnemy,addPrey(type,x,z){const mesh=makeCreature(type);scene.add(mesh);prey.push({type,x,z,y:hRaw(x,z),yaw:0,hp:PREY[type].hp,state:"idle",t:3,hop:0,vx:0,vz:0,zone:"forest",mesh})}};
 
 // ---------- HUD ----------
 const ICONS={hunger:'<path d="M5 13c-2-2-1-6 2-7s5 1 5 3l3 3-2 2-3-3c-2 0-3 1-5 2z" fill="currentColor"/><circle cx="14" cy="14" r="2" fill="currentColor"/>',thirst:'<path d="M10 2c3 5 5 7 5 10a5 5 0 0 1-10 0c0-3 2-5 5-10z" fill="currentColor"/>',bladder:'<path d="M10 3c4 3 6 7 4 11-2 3-6 3-8 0-2-4 0-8 4-11z" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10 7v8" stroke="currentColor" stroke-width="2"/>',warmth:'<path d="M10 2c1 4 5 5 5 10a5 5 0 0 1-10 0c0-3 2-4 3-6 0 2 1 3 2 3 1-2 0-4 0-7z" fill="currentColor"/>',energy:'<path d="M14 3a7 7 0 1 0 3 11 6 6 0 0 1-3-11z" fill="currentColor"/>'};
