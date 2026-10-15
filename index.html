@@ -2,7 +2,15 @@
 <html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<style>[hidden]{display:none!important}</style>
+<style>[hidden]{display:none!important}html,body{overscroll-behavior:none}</style>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0d1a12">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tarzan">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-192.png">
 <title>Tarzan in the Jungle</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Rubik:wght@400;600;700&display=swap">
@@ -171,6 +179,8 @@ body.touch #toast{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 34%)}
     <p class="lead">Roam the whole jungle, swing through the trees, hunt to survive, and fight what waits in the caves. The jungle follows your real clock, sunrise and weather.</p>
     <div class="btns"><button class="btn" id="bPlay" type="button">New game</button><button class="btn alt" id="bCont" type="button" hidden>Continue</button></div>
     <div class="btns"><button class="btn alt" id="bHow" type="button" style="font-size:16px">Controls</button><button class="btn alt" id="bWx2" type="button" style="font-size:16px">Weather &amp; place</button></div>
+    <button class="btn alt" id="bInstall" type="button" style="font-size:16px" hidden>Install app</button>
+    <p class="note" id="iosInstall" hidden style="max-width:36ch">To install on iPhone: tap the Share button in Safari, then <b>Add to Home Screen</b>.</p>
     <a href="classic.html" style="color:var(--dim);font-size:13px">Play the classic 2D version</a>
   </div>
 </div>
@@ -1152,6 +1162,16 @@ $('sWx').addEventListener('click',async e=>{const b=e.target.closest('button');i
   if(b.dataset.mode||b.dataset.kind||b.dataset.temp){await updateWeather();updateSky();renderWx();updateWxWidget()}});
 $('city').onchange=async e=>{settings.place=+e.target.value;saveSettings();updateSky();await updateWeather();renderWx();updateWxWidget()};
 
+// ---------- installable app ----------
+const standalone=matchMedia('(display-mode: standalone)').matches||matchMedia('(display-mode: fullscreen)').matches||navigator.standalone===true;
+if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost'))navigator.serviceWorker.register('sw.js').catch(()=>{});
+let installEvt=null;
+addEventListener('beforeinstallprompt',e=>{e.preventDefault();installEvt=e;if(!standalone)$('bInstall').hidden=false});
+$('bInstall').onclick=async()=>{if(!installEvt)return;installEvt.prompt();try{await installEvt.userChoice}catch(_){}installEvt=null;$('bInstall').hidden=true};
+addEventListener('appinstalled',()=>{$('bInstall').hidden=true;toast('Installed! Open Tarzan from your home screen.')});
+const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent)||navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1;
+if(isIOS&&!standalone)$('iosInstall').hidden=false;
+if(standalone&&screen.orientation&&screen.orientation.lock)screen.orientation.lock('landscape').catch(()=>{});
 // ---------- boot ----------
 resetGame();updateSky();updateWeather().then(updateWxWidget);tryGeolocation();setInterval(updateWeather,12*60*1000);
 if(store.get('tarzan3d-save',null))$('bCont').hidden=false;
