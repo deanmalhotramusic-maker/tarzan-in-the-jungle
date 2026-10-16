@@ -1,7 +1,7 @@
 // Offline support: keeps the game, 3D engine, models and textures on the phone so it opens without internet.
 // The game page itself is always fetched fresh when online, so updates show up on the next open.
 // Live weather always goes to the network. Bump VERSION when the game files change.
-const VERSION='tarzan-v5';
+const VERSION='tarzan-v6';
 const SHELL=['./','./index.html','./classic.html','./manifest.webmanifest','./icon-192.png','./icon-512.png','./icon-180.png',
   'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(VERSION).then(c=>c.addAll(SHELL.map(u=>new Request(u,{cache:'reload'})))).then(()=>self.skipWaiting()))});
