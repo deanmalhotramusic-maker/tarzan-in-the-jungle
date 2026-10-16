@@ -18,9 +18,11 @@ Open `index.html` in a browser, or turn on GitHub Pages for this repo (Settings 
 | W / S / A / D on a vine | Joystick on a vine | Swing higher, slow down, steer |
 | C | Crouch | Crouch; hide in tall grass, bushes or logs |
 | J | Hit | Punch |
-| K | Spear | Throw a spear where you are looking |
+| Q or right mouse (hold) | Hold Spear | Aim: over-the-shoulder view, crosshair and throw arc, with light aim assist |
+| K or left click while aiming | Release Spear | Throw the spear at the crosshair |
 | L | Roll | Dodge roll |
-| E | Use | Climb trees, eat, drink, cook, talk, bathroom, enter cave |
+| E | Use | Climb trees (hand over hand, circle the trunk, pull up onto the deck), grab a branch from the trunk, eat, drink, cook, talk, bathroom, enter cave |
+| A / D while hanging | Joystick while hanging | Move hand over hand along a branch; push forward to swing, Jump to let go, Crouch to drop |
 | F | Fire | Build a fire (3 sticks + flint) |
 | Z | Sleep | Sleep by a fire or in the Ape Village nest |
 | Y | Yell | Jungle yell |
@@ -35,6 +37,10 @@ Open `index.html` in a browser, or turn on GitHub Pages for this repo (Settings 
 - Graphics setting (Auto / Low / Medium / High) in Settings; Auto lowers itself if a phone struggles
 - Six zones: Ape Village, Dense Forest, Riverbank, Swamp, Rocky Cliffs, Ancient Ruins
 - Vine swinging with pendulum physics and swing combos
+- Branches between trees to hang from and travel hand over hand, with a swinging body and trailing legs
+- Hand-built animals with patterned skin, scales and fur: slithering snakes, crocodiles, monkeys, lizards, rabbits, bats, spiders and gorilla elders
+- Glowing, blinking fireflies at night; butterflies with patterned wings, parrots and dragonflies by day
+- Water ripples and splashes, landing dust and footsteps
 - Survival meters: food, water, bathroom, warmth, energy
 - Hunting (rabbits, piglets), cooking on fires, drinking at the river and waterfall
 - Enemies: snakes, lizards, hyena packs, crocodiles, rock-throwing monkeys
